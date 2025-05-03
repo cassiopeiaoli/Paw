@@ -86,11 +86,30 @@ fn process_directory(dir_path: &path::PathBuf) -> () {
 	}
 }
 
+fn validate_paw_project(dir_path: &path::PathBuf) -> () {
+	// It's only mutable because "any" method requires a mutable referencce to self :3
+	let mut directory = match fs::read_dir(dir_path) {
+		Ok(directory) => directory,
+		Err(e) => panic!("Unabled to read directory, reason: {e}"),
+	};
+
+	if !directory.any(|entry| {
+		match entry {
+			Ok(entry) => return entry.file_name() == "paw",
+			Err(e) => return false,
+		};
+	}) {
+		panic!("This directory is not a correct Paw! directory -w-");
+	}
+}
+
 fn main() {
 	let current_working_directory = match env::current_dir() {
 		Ok(current_working_directory) => current_working_directory,
 		Err(e) => panic!("Unable to fetch current working directory, reason: {e}"),
 	};
+	
+	validate_paw_project(&current_working_directory);
 	process_directory(&current_working_directory);
 }
 
