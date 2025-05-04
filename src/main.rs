@@ -35,7 +35,10 @@ fn process_bark(bark_path: &path::Path) -> () {
 	let output_path = parent_path.join(output_filename);
 	let mut file = fs::File::create(&output_path).expect("Couldn't create file");
 
-	file.write_all(output.as_bytes()).expect("Unable to write to a file");
+	// We also allow markdown in .bark files to make website-making easier.
+	// We shooooooould probably have some marked spots where we don't want MD to be processed
+	// But that's a problem for future Cassiopeia
+	file.write_all(markdown::to_html(&output).as_bytes()).expect("Unable to write to a file");
 }
 
 fn process_markdown(md_path: &path::Path) -> String {
