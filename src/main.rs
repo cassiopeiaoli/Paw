@@ -9,8 +9,8 @@ fn process_bark(bark_path: &path::Path) -> () {
 		Some(parent_path) => parent_path,
 		None => panic!("Couldn't extract parent path!"),
 	};
-	let contents = fs::read_to_string(bark_path).expect("Couldn't convert to a string!");
 
+	let contents = fs::read_to_string(bark_path).expect("Couldn't convert to a string!");
 	let regexp = Regex::new(r"!paw.*!").expect("Error while creating a regexp (for some reason?). Reason: {e}");
 	let string = contents.to_owned();
 	let mut output = contents.clone();
@@ -33,8 +33,8 @@ fn process_bark(bark_path: &path::Path) -> () {
 
 	let output_filename = String::from(bark_path.file_stem().unwrap().to_str().unwrap()) + ".html";
 	let output_path = parent_path.join(output_filename);
-	
 	let mut file = fs::File::create(&output_path).expect("Couldn't create file");
+
 	file.write_all(output.as_bytes()).expect("Unable to write to a file");
 }
 
@@ -45,6 +45,7 @@ fn process_markdown(md_path: &path::Path) -> String {
 
 fn process_file(file_path: &path::Path) -> () {	
 	let extension = file_path.extension();
+
 	match extension {
 		Some(extension) => {
 			if extension == "bark" {
@@ -62,6 +63,7 @@ fn process_directory(dir_path: &path::Path) -> () {
 		match entry {
 			Ok(entry) => {
 				let file_type = entry.file_type();
+
 				if file_type.unwrap().is_dir() {
 					process_directory(&entry.path());
 				} else {
@@ -90,6 +92,7 @@ fn validate_paw_project(dir_path: &path::Path) -> () {
 fn main() {
 	let current_working_directory = env::current_dir().expect("Unable to fetch current working directory");
 	let cwd_path = current_working_directory.as_path();
+
 	validate_paw_project(cwd_path);
 	process_directory(cwd_path);
 }
