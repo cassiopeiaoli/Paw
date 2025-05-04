@@ -11,7 +11,7 @@ fn process_bark(bark_path: &path::Path) -> () {
 	};
 
 	let contents = fs::read_to_string(bark_path).expect("Couldn't convert to a string!");
-	let regexp = Regex::new(r"!paw.*!").expect("Error while creating a regexp (for some reason?). Reason: {e}");
+	let regexp = Regex::new(r"!paw.*!").expect("Error while creating a regexp (for some reason?)");
 	let string = contents.to_owned();
 	let mut output = contents.clone();
 
@@ -35,9 +35,6 @@ fn process_bark(bark_path: &path::Path) -> () {
 	let output_path = parent_path.join(output_filename);
 	let mut file = fs::File::create(&output_path).expect("Couldn't create file");
 
-	// We also allow markdown in .bark files to make website-making easier.
-	// We shooooooould probably have some marked spots where we don't want MD to be processed
-	// But that's a problem for future Cassiopeia
 	file.write_all(markdown::to_html(&output).as_bytes()).expect("Unable to write to a file");
 }
 
