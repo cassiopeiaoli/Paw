@@ -4,17 +4,14 @@ use std::fs;
 use std::path;
 use regex::Regex;
 
-fn process_bark(bark_path: &path::PathBuf) -> () {
+fn process_bark(bark_path: &path::Path) -> () {
 	let parent_path = match bark_path.parent() {
 		Some(parent_path) => parent_path,
 		None => panic!("Couldn't extract parent path!"),
 	};
 	let contents = fs::read_to_string(bark_path).expect("Couldn't convert to a string!");
 
-	let regexp = match Regex::new(r"!paw.*!") {
-		Ok(regexp) => regexp,
-		Err(e) => panic!("Error while creating a regexp (for some reason?). Reason: {e}"),
-	};
+	let regexp = Regex::new(r"!paw.*!").expect("Error while creating a regexp (for some reason?). Reason: {e}");
 	let string = contents.to_owned();
 	let mut output = contents.clone();
 
@@ -37,23 +34,16 @@ fn process_bark(bark_path: &path::PathBuf) -> () {
 	let output_filename = String::from(bark_path.file_stem().unwrap().to_str().unwrap()) + ".html";
 	let output_path = parent_path.join(output_filename);
 	
-	let mut file = match fs::File::create(&output_path) {
-		Err(e) => panic!("Couldn't create a file. Reason: {e}"),
-		Ok(file) => file,
-	};
-
-	match file.write_all(output.as_bytes()) {
-		Err(e) => panic!("Couldn't write to the file. Reason: {e}"),
-		Ok(_) => println!("Finished processing {:?}", bark_path),
-	};
+	let mut file = fs::File::create(&output_path).expect("Couldn't create file");
+	file.write_all(output.as_bytes()).expect("Unable to write to a file");
 }
 
-fn process_markdown(md_path: &path::PathBuf) -> String {
+fn process_markdown(md_path: &path::Path) -> String {
 	let contents = fs::read_to_string(md_path).expect("Unable to convert markdown to HTML!");
 	return markdown::to_html(&contents.to_owned());
 }
 
-fn process_file(file_path: &path::PathBuf) -> () {	
+fn process_file(file_path: &path::Path) -> () {	
 	let extension = file_path.extension();
 	match extension {
 		Some(extension) => {
@@ -65,11 +55,8 @@ fn process_file(file_path: &path::PathBuf) -> () {
 	};
 }
 
-fn process_directory(dir_path: &path::PathBuf) -> () {
-	let directory = match fs::read_dir(dir_path) {
-		Ok(directory) => directory,
-		Err(e) => panic!("Unabled to read directory, reason: {e}"),
-	};
+fn process_directory(dir_path: &path::Path) -> () {
+	let directory = fs::read_dir(dir_path).expect("Unable to read directory");
 
 	for entry in directory {
 		match entry {
@@ -86,17 +73,14 @@ fn process_directory(dir_path: &path::PathBuf) -> () {
 	}
 }
 
-fn validate_paw_project(dir_path: &path::PathBuf) -> () {
-	// It's only mutable because "any" method requires a mutable referencce to self :3
-	let mut directory = match fs::read_dir(dir_path) {
-		Ok(directory) => directory,
-		Err(e) => panic!("Unabled to read directory, reason: {e}"),
-	};
+fn validate_paw_project(dir_path: &path::Path) -> () {
+	// It's only mutable because "any" method requires a mutable reference to self :3
+	let mut directory = fs::read_dir(dir_path).expect("Unable to read directory");
 
 	if !directory.any(|entry| {
 		match entry {
 			Ok(entry) => return entry.file_name() == "paw",
-			Err(e) => return false,
+			Err(_) => return false,
 		};
 	}) {
 		panic!("This directory is not a correct Paw! directory -w-");
@@ -104,12 +88,9 @@ fn validate_paw_project(dir_path: &path::PathBuf) -> () {
 }
 
 fn main() {
-	let current_working_directory = match env::current_dir() {
-		Ok(current_working_directory) => current_working_directory,
-		Err(e) => panic!("Unable to fetch current working directory, reason: {e}"),
-	};
-	
-	validate_paw_project(&current_working_directory);
-	process_directory(&current_working_directory);
+	let current_working_directory = env::current_dir().expect("Unable to fetch current working directory");
+	let cwd_path = current_working_directory.as_path();
+	validate_paw_project(cwd_path);
+	process_directory(cwd_path);
 }
 
