@@ -2,7 +2,6 @@ use std::env;
 use std::io::prelude::*;
 use std::fs;
 use std::path;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -46,6 +45,12 @@ fn read_bark_variables(bark_content: &String) -> Result<BarkFile, &'static str> 
     return Ok(bark_file_vars);
 }
 
+fn edit_header_title_and_description(config: &PawConfig, variables: &BarkFile) -> String {
+    let title = String::from("<title>") + &variables.title + "</title>";
+    let description = String::from("<meta name='description' content='") + &variables.description + "'>";
+    return config.header.replacen("!title", title.as_str(), 1).replacen("!description", description.as_str(), 1);
+}
+
 fn process_bark(bark_path: &path::Path, config: &PawConfig) -> () {
 	let parent_path = match bark_path.parent() {
 		Some(parent_path) => parent_path,
@@ -56,36 +61,20 @@ fn process_bark(bark_path: &path::Path, config: &PawConfig) -> () {
     let variables = match read_bark_variables(&contents) {
         Ok(variables) => variables,
         Err(e) => {
-            println!("{e}! Skipping file.");
+            println!("{}! Skipping file.", e);
             return;
         }
     };
-    println!("{:?}", markdown::to_html(variables.content.as_str()));
-	let regexp = Regex::new(r"!paw.*!").expect("Error while creating a regexp (for some reason?)");
-	let string = contents.to_owned();
-	let mut output = contents.clone();
-
-	for capture in regexp.captures_iter(&string) {
-		let captured_str = match capture.get(0) {
-			Some(captured_str) => captured_str,
-			None => break,
-		}.as_str();
-		let md_filename = captured_str.replace("!paw", "").replace("!", "");
-		let md_path = parent_path.join(md_filename.trim());
-		
-		if md_path.exists() {
-			let converted_md = process_markdown(&md_path);
-			output = output.replace(captured_str, converted_md.as_str());
-		} else {
-			output = output.replace(captured_str, "");
-		}
-	}
+    let header_content = edit_header_title_and_description(config, &variables);
+    let parsed_content = markdown::to_html(variables.content.as_str());
+    let output_content = String::from("<!doctype html><html>") + &header_content + "<body>" + &parsed_content + &config.footer + "</body></html>";
+    println!("{}", output_content);
 
 	let output_filename = String::from(bark_path.file_stem().unwrap().to_str().unwrap()) + ".html";
 	let output_path = parent_path.join(output_filename);
 	let mut file = fs::File::create(&output_path).expect("Couldn't create file");
 
-	file.write_all(markdown::to_html(&output).as_bytes()).expect("Unable to write to a file");
+	file.write_all(output_content.as_bytes()).expect("Unable to write to a file");
 }
 
 fn process_markdown(md_path: &path::Path) -> String {
@@ -137,7 +126,7 @@ fn read_config_file(dir_path: &path::Path) -> Result<PawConfig, &'static str> {
 	}) {
         
         let json_path = path::Path::new(dir_path);
-	    let contents = fs::read_to_string(json_path.join("paw.json")).expect("Couldn't convert to a string!");
+	    let contents = fs::read_to_string(json_path.join("paw.json")).expect("Couldn't read paw.json");
         match serde_json::from_str::<PawConfig>(contents.as_str()) {
             Ok(cfg) => {
                 let mut config: PawConfig = PawConfig{
@@ -146,17 +135,25 @@ fn read_config_file(dir_path: &path::Path) -> Result<PawConfig, &'static str> {
                     css_path: String::from(""),
                     js_path: String::from(""),
                 };
-                config.header = path::Path::new(dir_path).join(cfg.header).into_os_string().into_string().unwrap();
-                config.footer = path::Path::new(dir_path).join(cfg.footer).into_os_string().into_string().unwrap();
+                let header_path = path::Path::new(dir_path).join(cfg.header).into_os_string().into_string().unwrap();
+                let footer_path =path::Path::new(dir_path).join(cfg.footer).into_os_string().into_string().unwrap();
+                config.header = match fs::read_to_string(header_path) {
+                    Ok(content) => content,
+                    Err(_) => return Err("Unable to find/read header file"),
+                };
+                config.footer = match fs::read_to_string(footer_path) {
+                    Ok(content) => content,
+                    Err(_) => return Err("Unable to find/read footer file"),
+                };
                 config.css_path = path::Path::new(dir_path).join(cfg.css_path).into_os_string().into_string().unwrap();
                 config.js_path = path::Path::new(dir_path).join(cfg.js_path).into_os_string().into_string().unwrap();
                 return Ok(config);
             },
-            Err(_) => return Err("AAAAAAAAAAAAAAAAAA"), 
+            Err(_) => return Err("Incorrect structure of paw.json"), 
         };
 	}
 
-    return Err("AAAAAAAAAAAa2");
+    return Err("Unknown? idk");
 }
 
 fn main() {
@@ -166,7 +163,7 @@ fn main() {
 
 	let cfg = match read_config_file(testing_path) {
         Ok(cfg) => cfg,
-        Err(_) => panic!("bwe"),
+        Err(e) => panic!("{}", e),
     }; 
 	process_directory(testing_path, &cfg);
 }
