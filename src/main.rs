@@ -46,13 +46,43 @@ fn read_bark_variables(bark_content: &String) -> Result<BarkFile, &'static str> 
     return Ok(bark_file_vars);
 }
 
-fn edit_header_title_and_description(config: &PawConfig, variables: &BarkFile) -> String {
+fn adjust_relative_css_js_path(bark_path: &path::Path, config: &PawConfig) -> (String, String) {
+    let string_path = bark_path.to_str().expect("nuh uh");
+    let matches: Vec<&str> = string_path.matches("/").collect();
+
+    if matches.len() <= 1 {
+        return (String::from(config.css_path.clone()), String::from(config.js_path.clone()));
+    }
+
+    let mut css_path = String::from("../");
+    let mut js_path = String::from("../");
+
+    for _ in 1..matches.len() - 1 {
+        css_path += "../";
+        js_path += "../";
+    }
+
+    css_path += config.css_path.as_str();
+    js_path += config.js_path.as_str();
+
+    return (css_path, js_path);
+}
+
+fn edit_metadata(bark_path: &path::Path, config: &PawConfig, variables: &BarkFile) -> String {
     let title = String::from("<title>") + &variables.title + "</title>";
     let description = String::from("<meta name='description' content='") + &variables.description + "'>";
-    return config.header.replacen("!title", title.as_str(), 1).replacen("!description", description.as_str(), 1);
+    let css_js_links = adjust_relative_css_js_path(bark_path, config);
+    let css = String::from("<link rel='stylesheet' href='",) + css_js_links.0.as_str() + "'>";
+    let js = String::from("<script src='") + css_js_links.1.as_str() + "'></script>";
+    return config.header
+        .replacen("!title", title.as_str(), 1)
+        .replacen("!description", description.as_str(), 1)
+        .replacen("!css", css.as_str(), 1)
+        .replacen("!js", js.as_str(), 1);
 }
 
 fn process_bark(bark_path: &path::Path, config: &PawConfig) -> () {
+    println!("{}", config.css_path);
     println!("Processing: {}", bark_path.to_str().unwrap().yellow());
 	let parent_path = match bark_path.parent() {
 		Some(parent_path) => parent_path,
@@ -63,12 +93,12 @@ fn process_bark(bark_path: &path::Path, config: &PawConfig) -> () {
     let variables = match read_bark_variables(&contents) {
         Ok(variables) => variables,
         Err(e) => {
-            println!("Processing {} not successful", bark_path.to_str().unwrap().red());
-            println!("{}! Skipping file.", e);
+            eprintln!("Processing {} not successful", bark_path.to_str().unwrap().red());
+            eprintln!("{}! Skipping file.", e);
             return;
         }
     };
-    let header_content = edit_header_title_and_description(config, &variables);
+    let header_content = edit_metadata(bark_path, config, &variables);
     let parsed_content = markdown::to_html(variables.content.as_str());
     let output_content = String::from("<!doctype html><html>") + &header_content + "<body>" + &parsed_content + &config.footer + "</body></html>";
 
@@ -143,8 +173,8 @@ fn read_config_file(dir_path: &path::Path) -> Result<PawConfig, &'static str> {
                     Ok(content) => content,
                     Err(_) => return Err("Unable to find/read footer file"),
                 };
-                config.css_path = path::Path::new(dir_path).join(cfg.css_path).into_os_string().into_string().unwrap();
-                config.js_path = path::Path::new(dir_path).join(cfg.js_path).into_os_string().into_string().unwrap();
+                config.css_path = cfg.css_path;
+                config.js_path = cfg.js_path;
                 return Ok(config);
             },
             Err(_) => return Err("Incorrect structure of paw.json"), 
@@ -159,12 +189,12 @@ fn main() {
     println!("{} by {}\n", "A Static Site Generator".white().on_purple(), "itchydog".bold().italic().white().on_purple());
 	let current_working_directory = env::current_dir().expect("Unable to fetch current working directory");
 	let cwd_path = current_working_directory.as_path();
-    let testing_path = path::Path::new("testing");
+    //let testing_path = path::Path::new("testing");
 
-	let cfg = match read_config_file(testing_path) {
+	let cfg = match read_config_file(cwd_path) {
         Ok(cfg) => cfg,
         Err(e) => panic!("{}", e),
     }; 
-	process_directory(testing_path, &cfg);
+	process_directory(cwd_path, &cfg);
 }
 
