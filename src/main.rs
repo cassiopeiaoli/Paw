@@ -3,6 +3,7 @@ use std::io::prelude::*;
 use std::fs;
 use std::path;
 use serde::{Deserialize, Serialize};
+use colored::Colorize;
 
 #[derive(Serialize, Deserialize)]
 struct PawConfig {
@@ -52,6 +53,7 @@ fn edit_header_title_and_description(config: &PawConfig, variables: &BarkFile) -
 }
 
 fn process_bark(bark_path: &path::Path, config: &PawConfig) -> () {
+    println!("Processing: {}", bark_path.to_str().unwrap().yellow());
 	let parent_path = match bark_path.parent() {
 		Some(parent_path) => parent_path,
 		None => panic!("Couldn't extract parent path!"),
@@ -61,6 +63,7 @@ fn process_bark(bark_path: &path::Path, config: &PawConfig) -> () {
     let variables = match read_bark_variables(&contents) {
         Ok(variables) => variables,
         Err(e) => {
+            println!("Processing {} not successful", bark_path.to_str().unwrap().red());
             println!("{}! Skipping file.", e);
             return;
         }
@@ -68,18 +71,13 @@ fn process_bark(bark_path: &path::Path, config: &PawConfig) -> () {
     let header_content = edit_header_title_and_description(config, &variables);
     let parsed_content = markdown::to_html(variables.content.as_str());
     let output_content = String::from("<!doctype html><html>") + &header_content + "<body>" + &parsed_content + &config.footer + "</body></html>";
-    println!("{}", output_content);
 
 	let output_filename = String::from(bark_path.file_stem().unwrap().to_str().unwrap()) + ".html";
 	let output_path = parent_path.join(output_filename);
 	let mut file = fs::File::create(&output_path).expect("Couldn't create file");
 
 	file.write_all(output_content.as_bytes()).expect("Unable to write to a file");
-}
-
-fn process_markdown(md_path: &path::Path) -> String {
-	let contents = fs::read_to_string(md_path).expect("Unable to convert markdown to HTML!");
-	return markdown::to_html(&contents.to_owned());
+    println!("Processing {} {}\n", bark_path.to_str().unwrap().green(), "successful".green());
 }
 
 fn process_file(file_path: &path::Path, config: &PawConfig) -> () {	
@@ -153,10 +151,12 @@ fn read_config_file(dir_path: &path::Path) -> Result<PawConfig, &'static str> {
         };
 	}
 
-    return Err("Unknown? idk");
+    return Err("paw.json not found");
 }
 
 fn main() {
+    println!("{}", "PAW!".white().bold().on_purple());
+    println!("{} by {}\n", "A Static Site Generator".white().on_purple(), "itchydog".bold().italic().white().on_purple());
 	let current_working_directory = env::current_dir().expect("Unable to fetch current working directory");
 	let cwd_path = current_working_directory.as_path();
     let testing_path = path::Path::new("testing");
