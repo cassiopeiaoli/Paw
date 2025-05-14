@@ -4,6 +4,7 @@ use std::fs;
 use std::path;
 use serde::{Deserialize, Serialize};
 use colored::Colorize;
+use pathdiff::diff_paths;
 
 #[derive(Serialize, Deserialize)]
 struct PawConfig {
@@ -54,16 +55,9 @@ fn adjust_relative_css_js_path(bark_path: &path::Path, config: &PawConfig) -> (S
         return (String::from(config.css_path.clone()), String::from(config.js_path.clone()));
     }
 
-    let mut css_path = String::from("../");
-    let mut js_path = String::from("../");
-
-    for _ in 1..matches.len() - 1 {
-        css_path += "../";
-        js_path += "../";
-    }
-
-    css_path += config.css_path.as_str();
-    js_path += config.js_path.as_str();
+    // diff_paths does a weird thing where it will always add ../ if files are in the same path???
+    let css_path = diff_paths(&config.css_path, bark_path).unwrap().to_str().unwrap().to_owned().replacen("../", "", 1); 
+    let js_path = diff_paths(&config.js_path, bark_path).unwrap().to_str().unwrap().to_owned().replacen("../", "", 1); 
 
     return (css_path, js_path);
 }
@@ -73,7 +67,7 @@ fn edit_metadata(bark_path: &path::Path, config: &PawConfig, variables: &BarkFil
     let description = String::from("<meta name='description' content='") + &variables.description + "'>";
     let css_js_links = adjust_relative_css_js_path(bark_path, config);
     let css = String::from("<link rel='stylesheet' href='",) + css_js_links.0.as_str() + "'>";
-    let js = String::from("<script src='") + css_js_links.1.as_str() + "'></script>";
+    let js = String::from("<script defer src='") + css_js_links.1.as_str() + "'></script>";
     return config.header
         .replacen("!title", title.as_str(), 1)
         .replacen("!description", description.as_str(), 1)
@@ -173,8 +167,8 @@ fn read_config_file(dir_path: &path::Path) -> Result<PawConfig, &'static str> {
                     Ok(content) => content,
                     Err(_) => return Err("Unable to find/read footer file"),
                 };
-                config.css_path = cfg.css_path;
-                config.js_path = cfg.js_path;
+                config.css_path = path::Path::new(dir_path).join(cfg.css_path).into_os_string().into_string().unwrap();
+                config.js_path = path::Path::new(dir_path).join(cfg.js_path).into_os_string().into_string().unwrap();
                 return Ok(config);
             },
             Err(_) => return Err("Incorrect structure of paw.json"), 
@@ -190,11 +184,13 @@ fn main() {
 	let current_working_directory = env::current_dir().expect("Unable to fetch current working directory");
 	let cwd_path = current_working_directory.as_path();
     //let testing_path = path::Path::new("testing");
+    println!("{:?}", cwd_path);
 
 	let cfg = match read_config_file(cwd_path) {
         Ok(cfg) => cfg,
         Err(e) => panic!("{}", e),
-    }; 
-	process_directory(cwd_path, &cfg);
+    };
+
+    process_directory(cwd_path, &cfg);
 }
 
